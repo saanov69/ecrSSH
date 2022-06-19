@@ -1,23 +1,107 @@
 # This Python file uses the following encoding: utf-8
+# Python 3.9.5
+# провенено 'mikrotik_routeros','linux'
 #########################################
 ####### Execute commands remotly with SSH
 #########################################
 #
 #
 import PySimpleGUI as sg
+from datetime import date
 import datetime
 import time
-
 import sys
 import os
+from netmiko import ConnectHandler
+import logging 
 
+
+class ExecuteCommands:
+##    def Handler(self):
+##        with open("randomfile.txt", "w") as external_file:
+##            add_text = "This text will be added to the file"
+##            print(add_text, file=external_file)
+##            external_file.close()
+
+    def __init__(self, oParent, lData):
+        self.device_type = {
+            "device_type":  lData[3],
+            "host": lData[2],
+            "username": lData[5],
+            "password": lData[6],
+            "secret": lData[7],
+        }
+        self.lCommands:list = lData[8].split('\n')
+        self.DateTime = datetime.datetime.now()
+        self.sDate:string = (f'{self.DateTime.strftime("%Y_%m_%d")}')
+        self.sTime:string = (f'{self.DateTime.strftime("%H_%M_%S")}')
+        self.sIp:string = lData[2]
+        self.sLogFileName:string = 'Logs/' + lData[4] + '__' + self.sIp + '__' + self.sDate + '__' + self.sTime + '.txt'
+        self.FindPrompt:string = ''
+        self.SendCommand:string = ''
+        
+        print(self.sLogFileName)
+
+    def send_now(self):
+        with open(self.sLogFileName, "w") as external_file:
+            try:
+                net_connect = ConnectHandler(**self.device_type)
+                # Call 'enable()' method to elevate privileges
+                if 'cisco' in self.device_type:
+                    net_connect.enable()
+                for self.command in self.lCommands:
+                    self.command = self.command.replace('[DATE]', self.sDate)
+                    self.command = self.command.replace('[TIME]', self.sTime)
+                    self.FindPrompt = net_connect.find_prompt()
+                    self.SendCommand = net_connect.send_command(self.command, read_timeout=10, strip_prompt=False, strip_command=False)
+                    print(self.FindPrompt)
+                    print(self.SendCommand)
+                    print(self.FindPrompt, file=external_file)
+                    print(self.SendCommand, file=external_file)
+                    time.sleep(0.5)
+                return True
+            except Exception as e:
+                print(f"Unexpected error occurred while connecting to host: {e}")
+                print(f"Unexpected error occurred while connecting to host: {e}", file=external_file)
+                return False
+        external_file.close()
+
+        
 class ecrsshModify:
     def __init__(self, oSg, oParent, nRecno, lData, cEvent):
         self.oParent = oParent
         self.sg = oSg
         self.nRecno = nRecno
         self.lData = lData
-
+        self.lDevType:list = ['a10','accedian','adtran_os','alcatel_aos','alcatel_sros',
+            'allied_telesis_awplus','apresia_aeos','arista_eos','aruba_os',
+            'aruba_osswitch','aruba_procurve','avaya_ers','avaya_vsp',
+            'broadcom_icos','brocade_fastiron','brocade_fos',
+            'brocade_netiron','brocade_nos','brocade_vdx',
+            'brocade_vyos','calix_b6','cdot_cros','centec_os',
+            'checkpoint_gaia','ciena_saos','cisco_asa','cisco_ftd',
+            'cisco_ios','cisco_nxos','cisco_s300','cisco_tp',
+            'cisco_viptela','cisco_wlc','cisco_xe','cisco_xr',
+            'cloudgenix_ion','coriant','dell_dnos9','dell_force10',
+            'dell_isilon','dell_os10','dell_os6','dell_os9',
+            'dell_powerconnect','dell_sonic','dlink_ds','eltex',
+            'eltex_esr','endace','enterasys','ericsson_ipos',
+            'extreme','extreme_ers','extreme_exos','extreme_netiron',
+            'extreme_nos','extreme_slx','extreme_tierra',
+            'extreme_vdx','extreme_vsp','extreme_wing','f5_linux',
+            'f5_ltm','f5_tmsh','flexvnf','fortinet','generic',
+            'generic_termserver','hp_comware','hp_procurve',
+            'huawei','huawei_olt','huawei_smartax','huawei_vrpv8',
+            'ipinfusion_ocnos','juniper','juniper_junos','juniper_screenos',
+            'keymile','keymile_nos','linux','mellanox','mellanox_mlnxos',
+            'mikrotik_routeros','mikrotik_switchos','mrv_lx','mrv_optiswitch',
+            'netapp_cdot','netgear_prosafe','netscaler','nokia_sros',
+            'oneaccess_oneos','ovs_linux','paloalto_panos','pluribus',
+            'quanta_mesh','rad_etx','raisecom_roap','ruckus_fastiron',
+            'ruijie_os','sixwind_os','sophos_sfos','supermicro_smis',
+            'tplink_jetstream','ubiquiti_edge','ubiquiti_edgerouter',
+            'ubiquiti_edgeswitch','ubiquiti_unifiswitch','vyatta_vyos',
+            'vyos','watchguard_fireware','yamaha','zte_zxros','zyxel_os']
         storage64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAMAAADXqc3KAAAABGdBTUEAALGPC/xhBQAAAwBQTFRFAAAABwcHDQ0NDg4ODw8PFxcXGRkZGhoaGxsbHh4eIyMjJSUlJiYmJycnKCgoMTExMjIyNTU1NjY2Nzc3AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAouNksgAAAQB0Uk5T////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////AFP3ByUAAAAJcEhZcwAADdQAAA3UAe+RuhUAAAAYdEVYdFNvZnR3YXJlAHBhaW50Lm5ldCA0LjEuMWMqnEsAAAC5SURBVChTfZLbDsMgDEPpbb3TDv7/W7PYuAztYUeqhO2QAGowkXIMIeYkaSU4QsNBi4GcyhNINpTglmq4GWSphvy/ldkuLXZ4HmAxy3NmFJaA4guKGCwsjClfV05+fWdhYBtFw+amB292aygW3M7fsPTwjmadZkCvHEtWaAYTViBqVwgTA3tJVnB6D/xhaimItDhjMBvlhtFsaIafnEtOaAY/twAw/eslK70CbX8obUvgJNw9Jv0+Zh8D4s5+VAm/LwAAAABJRU5ErkJggg=='
         close64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAACXBIWXMAAAsSAAALEgHS3X78AAAE30lEQVRIiZ2VXYgdRRqGn6+quvucM/85iRoTNevMBJFEWY0GFQTBC1HBlaz/jMpoFFfXBdmFvdiLvRIEFRHFGBXMjUQhF/6Bol6sSNaIruCNir/R/Dlx5iRzck736e6qby/6JDlx9CIWFN10Ue/7vW+9X7XcDn8bryWPL2vERkNQQPj9Q72K7F3s7Hxb9bZ98L0bj91jt1y23kxNTxIEGUQ/aTYR6WW9cud/Prx01zf7/7FP5EHXHG7Y6bVTpBPLMSegCWKEEMKvkihgjEWDP+FbEjxTa1bjv9l/CsIKF3ypHhUDSFGACCKC956iKKjV6/hfkCjgUNK0TW1oCA3h+EJk8UUBYFCsQaSyRajArUWLnEONcTrT68nTLtZaEKmmMTiUlsREGy9HO0dgcL1y6lgtZrAsEYFexhwxq2buYfru+1mcOo+828UYg4rgUH7OSkY3zbDq1lkaV1yFP9TqEyy18jiBCMF7DjYmOOu+hxifnCSKItZuvp/F6fPJ05TEwE+dHhN33MfpGy4iFAVjf7qF8etvBV9y1IilBApGIMt6TExOM372JKqKqhLFMdOz93Jk6jx+bHVoztzLyj9eiHqP2Gq7O3UlGAuq1RwYDlUwhoChMdSAz3ZxaEeD8T/fBggaAnGtxpqZWdKFBSbOPLMCCQGJItJPdrHw4lOYRgNsBM6dSCDGErIuodtGkhoyPEr68U5svcbI1ZsQY0CV2vAw9ZGRKjEiSBTR/fQjDm9/AddcjqoSul182kYHVDhJauRffUH7wD7ilatxzVOwI6PM7XiJLO2x4rob0CgGVTSEKigidD94j/ltW9Dg0b0/4BfmyQ8ewKUdWLZ6wCIB9SXFXJvQ+hLkc6QeEznHf199jY1rpjh1w0ZUFTGm7z18/tSj2Hffor5shKLdhhJCADMcw7IlKRIkAqkJRIa4LPl6d5c/PPJkBd5vpArcArD+ue101l1Md08bFxuIBUlOyOUggUIAVIl94Kv5wKqtz7L+7r/0bRHEmApcFbwnHhljw6tv0b3kEtK5gDWmj/GbfQAWZbdaztjyPOfP3oN6D8GDCO133uDAvx9CyxKsRX1JMjbBBa+8Rnbl5RSpR35RfXUGfVLnYGFBcTfdwLo77yLkPYy14CLa773JngfuoNy7QOh2WPnw09WVkufUm8s598G/s+eT9wmBJZ1m+sVTFNBc4Wi8vJ3v//kAJk7AOhbf3MGezTfjWwuYCcv8s1s58K+/okWOxDGdjz5g7+YZtKRSoL+igCp5FKVntGk48sTTzDWb1C+4mB833wgETD2CELBjEfNbtyAjo4xdcz27N11L6B5GGoZQhN+26KiSoII9LebnJx9BkggzNIQkyfEdItiRQGvbM7S2bQHJMGN1NO8ds2dQhBORYBCjAFEE1kFSw0QxuAiTJCAGce64vz4gviTkOTJcErIMMRbyDIxg7bHTFnc47clcmpdj43VkeBRJEkytgdTqSL2OiRMkSRDroH9t4EtCUaBZhmYpIUurZ9pFfVnuX+w62xfjeq3D3/6vbifXrT1XkzgWdREmipA4RlwMUYRY21cg/X+lJ5gSbIHGOVovCHmOCSX7DrbMx599icIhVI2cA5c5mC1gbGnITm4oqAOr0PoOXs9g51HAGiITyCDByXDp4KuiaoESmP8/YC0Y5GajmEsAAAAASUVORK5CYII='
         toolbar_buttons = [[sg.Button('', image_data=storage64[22:], button_color=('white', sg.COLOR_SYSTEM_DEFAULT), pad=(0, 0), key='-storage-'),
@@ -27,12 +111,14 @@ class ecrsshModify:
             [self.sg.T('status   ', size=(10, 1)), self.sg.Combo(values=('execute', 'nothing'), default_value=self.lData[0], readonly=True, key='-STATUS-', size=(100, 1))],
             [self.sg.T('name job ', size=(10, 1)), self.sg.Input(self.lData[1], key='-OPERATION-', size=(100, 1), do_not_clear=False)],
             [self.sg.T('IP       ', size=(10, 1)), self.sg.Input(self.lData[2], key='-IP-', size=(100, 1), do_not_clear=False)],
-            [self.sg.T('model    ', size=(10, 1)), self.sg.Combo(values=('qteq    ', 'avaya   ', 'Linux'), default_value=self.lData[3], readonly=False, key='-MODEL-', size=(100, 1))],
+            [self.sg.T('model    ', size=(10, 1)), self.sg.Combo(values=(self.lDevType), default_value=self.lData[3], readonly=True, key='-MODEL-', size=(100, 1))],
             [self.sg.T('ID device', size=(10, 1)), self.sg.Input(self.lData[4], key='-IDdevice-', size=(100, 1), do_not_clear=False)],
             [self.sg.T('login    ', size=(10, 1)), self.sg.Input(self.lData[5], key='-LOGIN-', size=(100, 1), do_not_clear=False)],
             [self.sg.T('password ', size=(10, 1)), self.sg.Input(self.lData[6], key='-PASSWORD-', size=(100, 1), do_not_clear=False)],
-            [self.sg.T('commads  ', size=(10, 1)), self.sg.Multiline(self.lData[7], key='-COMMANDS-', size=(100, 15), do_not_clear=False)],
+            [self.sg.T('secret   ', size=(10, 1)), self.sg.Input(self.lData[7], key='-SECRET-', size=(100, 1), do_not_clear=False)],
+            [self.sg.T('commands ', size=(10, 1)), self.sg.Multiline(self.lData[8], key='-COMMANDS-', size=(100, 15), do_not_clear=False)],
 	    [self.sg.Button('Save', key='--SAVE--'), self.sg.Button('Cancel', key='--CANCEL--')],
+            [self.sg.T('Please use variabes [DATE] and [TIME] if you need in commands ', size=(100, 1))],
             [self.sg.Text('Please press: <F2> - Save or <Esc> - Cancel', relief=self.sg.RELIEF_SUNKEN, size=(120, 1), pad=(0, 3), key='-status-')]
                        ]
 
@@ -71,7 +157,7 @@ class ecrsshModify:
             # ------ Интерфейс закрыт------ #
             self.window.close()
         if (cEvent == '--SAVE--' or cEvent == 'F2:68') and self.oParent.cEvent in ['--APPEND--', 'Append...']:
-            self.oParent.data.append(['', '', '', '', '', '', '', ''])
+            self.oParent.data.append(['', '', '', '', '', '', '', '', ''])
             self.oParent.recno = self.oParent.recount
             self.SaveData(-1, cValue)
             self.oParent.window['-DEVICE-'].update(values=self.oParent.data)
@@ -80,7 +166,7 @@ class ecrsshModify:
             self.window.close()
         if (cEvent == '--SAVE--' or cEvent == 'F2:68') and self.oParent.cEvent in ['--APPENDCOPY--', 'Append copy...']:
         # Сохранить 
-            self.oParent.data.append(['', '', '', '', '', '', '', ''])
+            self.oParent.data.append(['', '', '', '', '', '', '', '', ''])
             self.oParent.recno = self.oParent.recount
             self.SaveData(-1, cValue)
             self.oParent.window['-DEVICE-'].update(values=self.oParent.data)
@@ -102,7 +188,8 @@ class ecrsshModify:
         self.oParent.data[cRecNo][4] = cValue['-IDdevice-']
         self.oParent.data[cRecNo][5] = cValue['-LOGIN-']
         self.oParent.data[cRecNo][6] = cValue['-PASSWORD-']
-        self.oParent.data[cRecNo][7] = cValue['-COMMANDS-']
+        self.oParent.data[cRecNo][7] = cValue['-SECRET-']
+        self.oParent.data[cRecNo][8] = cValue['-COMMANDS-']
  
 
 class ecrssh:
@@ -118,7 +205,7 @@ class ecrssh:
         # ------ Определение МЕНЮ ------ #
         self.menu_def:list = [['&File', ['!&Open...', '&Save', '---', 'E&xit']],
                          ['&Table', ['&Append...', 'Append &copy...', '---', '&Edit...', '---', '&Delete'], ],
-                         ['&Run', ['&MARK', '---', '&Start', '!&Pause', '!&Stop']],
+                         ['&Run', ['&Mark/Unmark     <Space>', '---', '&Start                  <F2>', '!&Pause', '!&Stop']],
                          ['&About...'],
                          ]
         # ------ Link interfaces object ------ #
@@ -129,7 +216,7 @@ class ecrssh:
         self.data:list = self.settings['data']
         #print(hasattr(self, 'data'), self.data,type(self.data),not self.data)
         if not self.data:
-            self.data:list = [['execute', '', 'x.x.x.x', '', '', 'admin', '', '']]
+            self.data:list = [['execute', '', 'x.x.x.x', 'linux', 'id001', 'admin', '', 'need only for Cisco', '']]
 #            self.recount = 1
         
         self.recno = 0
@@ -148,9 +235,9 @@ class ecrssh:
                                       num_rows=min(20, 20))],
                        [self.sg.Button('Append...', key='--APPEND--'), self.sg.Button('Append copy...', key='--APPENDCOPY--'),
                         self.sg.Button('Edit...', key='--EDIT--'), self.sg.Button('Delete', key='--DELETE--'),
-                        self.sg.Text('                        '),
-                        self.sg.Button('Mark', key='--MARK--'),
-                        self.sg.Text('                         '),
+                        self.sg.Text('                '),
+                        self.sg.Button('Mark/Unmark', key='--Mark/Unmark--'),
+                        self.sg.Text('                '),
                         self.sg.Button('Start', key='--START--'), self.sg.Button('Pause', key='--PAUSE--'), self.sg.Button('Stop', key='--STOP--')],
                        [self.sg.Output(size=(120, 15), background_color='black', text_color='white')],
                        [self.sg.Text('', relief=self.sg.RELIEF_SUNKEN, size=(25, 1), pad=(0, 3), key='-records-'),
@@ -193,22 +280,20 @@ class ecrssh:
         
 
     def KeyPressHandler(self):
-        #print('KeyPressHandler<', self.cEvent, self.cValue)
         
         if self.fStart == True:
         # execute только при запуске для получения фокуса таблицей
            self.refresh()
            self.fStart = False
-#           print(os.path.dirname(sys.executable))
-#           print(self.settings)
            return False
         else:
             self.recno = self.cValue['-DEVICE-'][0]
             self.recount = len(self.data)
             self.window['-records-'].update(f'record: {self.recno}/{len(self.data)}')
             self.window['-status-'].update(f'{self.msg1} {self.cEvent}')
-            self.date = datetime.datetime.now()
+            self.date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             self.window['-TIMER-'].update(f'{self.date}')
+
 
         if self.cEvent == 'Home:110':
         #переход в начало таблицы
@@ -222,6 +307,18 @@ class ecrssh:
             self.refresh()
             return False
 
+        if self.cEvent == 'F2:68':
+        #переход к выполнению комманды
+            self.cEvent = '--START--'
+            self.Handler()
+            return False
+
+        if self.cEvent == 'F3:69':
+        #переход к выполнению всех комманд
+            self.cEvent = '--START--'
+            self.Handler()
+            return False
+
         if self.cEvent == 'F4:70':
         #переход к редактированию строки таблицы
             self.cEvent = '--EDIT--'
@@ -229,29 +326,22 @@ class ecrssh:
             return False
 
         if self.cEvent == 'F5:71':
-        #переход к редактированию строки таблицы
+        #переход к добавлению строки таблицы
             self.cEvent = '--APPEND--'
             self.Handler()
             return False
 
         if self.cEvent == 'F6:72':
-        #переход к редактированию строки таблицы
+        #переход к копированию и добавлению строки таблицы
             self.cEvent = '--APPENDCOPY--'
             self.Handler()
             return False
 
-        if self.cEvent == 'F2:68':
-        #переход к редактированию строки таблицы
-            self.cEvent = '--START--'
-            self.Handler()
-            return False
-
         if self.cEvent == self.cEvent == 'space:65':
-        #переключение режима обработки
-            self.cEvent = '--MARK--'
+        #переключение режима обработки для устройства
+            self.cEvent = '--Mark/Unmark--'
             self.Handler()
             return False
-
         return True
 
     def refresh(self):
@@ -273,7 +363,7 @@ class ecrssh:
     def Handler(self):
     ## ------ Handler events------ #
     ## ------ Обработка поступивших событий от элементов управления------ #
-        if self.cEvent in ['--MARK--', 'MARK']:
+        if self.cEvent in ['--Mark/Unmark--', 'Mark/Unmark     <Space>']:
             self.window.enable = False
             if self.data[self.recno][0] == 'execute':
                 self.data[self.recno][0] = 'nothing'
@@ -285,25 +375,45 @@ class ecrssh:
             self.window.enable = False
             self.oedit = ecrsshModify(sg, self, self.recno, self.data[self.recno], self.cEvent).eventread()
             self.refresh()
+            self.settings['data'] = self.data
+            print('save to file [main.json]')
         elif self.cEvent in ['--APPEND--', 'Append...']:
             self.window.enable = False
-            self.oedit = ecrsshModify(sg, self, self.recno, ['execute', '', 'x.x.x.x', 'Linux', 'id'+str(self.recount), 'admin', '', ''], self.cEvent).eventread()
+            self.oedit = ecrsshModify(sg, self, self.recno, ['execute', '', 'x.x.x.x', 'linux', 'id'+str(self.recount), 'admin', '', 'need only for Cisco', ''], self.cEvent).eventread()
             self.refresh()
+            self.settings['data'] = self.data
+            print('save to file [main.json]')
         elif self.cEvent in ['--APPENDCOPY--', 'Append copy...']:
             self.window.enable = False
             self.oedit = ecrsshModify(sg, self, self.recno, self.data[self.recno], self.cEvent).eventread()
             self.refresh()
+            self.settings['data'] = self.data
+            print('save to file [main.json]')
         elif self.cEvent in ['--DELETE--', 'Delete']:
             self.window.enable = False
             self.data.remove(self.data[self.recno])
             if not self.data:
-                self.data:list = [['execute', '', 'x.x.x.x', '', '', 'admin', '', '']]
+                self.data:list = [['execute', '', 'x.x.x.x', 'linux', 'id001', 'admin', '', 'need only for Cisco', '']]
             self.recno -= self.recno
             self.refresh()
-        elif self.cEvent in ['--START--', 'Start']:
+            self.settings['data'] = self.data
+            print('save to file [main.json]')
+        elif self.cEvent in ['--START--', 'Start                  <F2>']:
             print('--START--')
-            time.sleep(10)
-            print('--STOP--')
+            #self.window.enable = False
+            self.data[self.recno][0] = 'working'
+            self.refresh()
+
+            retval = ExecuteCommands(self, self.data[self.recno]).send_now()
+
+            #self.window.enable = False
+            if retval:
+                print('--FINISH OK--')
+                self.data[self.recno][0] = 'finished OK'
+            else:
+                print('--ERROR--')
+                self.data[self.recno][0] = 'error'
+            self.refresh()
         elif self.cEvent in ['--PAUSE--', 'Pause']:
             pass
         elif self.cEvent in ['--STOP--', 'Stop']:
@@ -311,7 +421,6 @@ class ecrssh:
         elif self.cEvent == 'Save':
             self.settings['data'] = self.data
             print('save to file [main.json]')
-
 
 
 # Press the green button in the gutter to run the script.
