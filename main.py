@@ -6,6 +6,7 @@
 #########################################
 #
 #
+from email.errors import NonASCIILocalPartDefect
 import PySimpleGUI as sg
 from datetime import date
 import datetime
@@ -17,12 +18,6 @@ import logging
 
 
 class ExecuteCommands:
-##    def Handler(self):
-##        with open("randomfile.txt", "w") as external_file:
-##            add_text = "This text will be added to the file"
-##            print(add_text, file=external_file)
-##            external_file.close()
-
     def __init__(self, oParent, lData):
         self.device_type = {
             "device_type":  lData[3],
@@ -31,15 +26,16 @@ class ExecuteCommands:
             "password": lData[6],
             "secret": lData[7],
         }
-        self.lCommands:list = lData[8].split('\n')
+        self.lCommands = lData[8].split('\n')
         self.DateTime = datetime.datetime.now()
-        self.sDate:string = (f'{self.DateTime.strftime("%Y_%m_%d")}')
-        self.sTime:string = (f'{self.DateTime.strftime("%H_%M_%S")}')
-        self.sIp:string = lData[2]
-        self.sLogFileName:string = 'Logs/' + lData[4] + '__' + self.sIp + '__' + self.sDate + '__' + self.sTime + '.txt'
-        self.FindPrompt:string = ''
-        self.SendCommand:string = ''
-        
+        self.sDate  = (f'{self.DateTime.strftime("%Y_%m_%d")}')
+        self.sTime  = (f'{self.DateTime.strftime("%H_%M_%S")}')
+        self.sIp  = lData[2]
+        if not os.path.isdir('Logs/'+self.sDate):
+            os.makedirs('Logs/'+self.sDate)            
+        self.sLogFileName  = 'Logs/' + self.sDate +'/'+ lData[4] + '__' + self.sIp + '__' + self.sDate + '__' + self.sTime + '.txt'
+        self.FindPrompt  = ''
+        self.SendCommand  = ''
         print(self.sLogFileName)
 
     def send_now(self):
@@ -58,7 +54,7 @@ class ExecuteCommands:
                     print(self.SendCommand)
                     print(self.FindPrompt, file=external_file)
                     print(self.SendCommand, file=external_file)
-                    time.sleep(0.5)
+                    time.sleep(0.1)
                 return True
             except Exception as e:
                 print(f"Unexpected error occurred while connecting to host: {e}")
@@ -73,6 +69,7 @@ class ecrsshModify:
         self.sg = oSg
         self.nRecno = nRecno
         self.lData = lData
+        #Возможные варианты device_type из netmiko
         self.lDevType:list = ['a10','accedian','adtran_os','alcatel_aos','alcatel_sros',
             'allied_telesis_awplus','apresia_aeos','arista_eos','aruba_os',
             'aruba_osswitch','aruba_procurve','avaya_ers','avaya_vsp',
@@ -122,7 +119,6 @@ class ecrsshModify:
             [self.sg.Text('Please press: <F2> - Save or <Esc> - Cancel', relief=self.sg.RELIEF_SUNKEN, size=(120, 1), pad=(0, 3), key='-status-')]
                        ]
 
-
         self.window = sg.Window('Edit Device', self.layout, force_toplevel=True, use_default_focus=True, return_keyboard_events=True, finalize=False)
 
         #Сделать текущее окно модальным
@@ -150,13 +146,15 @@ class ecrsshModify:
                 break
 
     def Handler(self, cEvent, cValue):
-        if (cEvent == '--SAVE--' or cEvent == 'F2:68') and self.oParent.cEvent in ['--EDIT--', 'Edit...']:
+        # Сохранить отредактированную запись
+        if (cEvent in ['--SAVE--', 'F2:68', 'F2:113']) and self.oParent.cEvent in ['--EDIT--', 'Edit...']:
             self.SaveData(self.nRecno, cValue)
             self.oParent.window['-DEVICE-'].update(values=self.oParent.data)
             # ------ Interfaces CLOSE------ #
             # ------ Интерфейс закрыт------ #
             self.window.close()
-        if (cEvent == '--SAVE--' or cEvent == 'F2:68') and self.oParent.cEvent in ['--APPEND--', 'Append...']:
+        if (cEvent in ['--SAVE--', 'F2:68', 'F2:113']) and self.oParent.cEvent in ['--APPEND--', 'Append...']:
+        # Сохранить отредактированную вновь добавленную запись
             self.oParent.data.append(['', '', '', '', '', '', '', '', ''])
             self.oParent.recno = self.oParent.recount
             self.SaveData(-1, cValue)
@@ -164,8 +162,8 @@ class ecrsshModify:
             # ------ Interfaces CLOSE------ #
             # ------ Интерфейс закрыт------ #
             self.window.close()
-        if (cEvent == '--SAVE--' or cEvent == 'F2:68') and self.oParent.cEvent in ['--APPENDCOPY--', 'Append copy...']:
-        # Сохранить 
+        if (cEvent in ['--SAVE--', 'F2:68', 'F2:113']) and self.oParent.cEvent in ['--APPENDCOPY--', 'Append copy...']:
+        # Сохранить отредактированную копию запись
             self.oParent.data.append(['', '', '', '', '', '', '', '', ''])
             self.oParent.recno = self.oParent.recount
             self.SaveData(-1, cValue)
@@ -173,7 +171,7 @@ class ecrsshModify:
             # ------ Interfaces CLOSE------ #
             # ------ Интерфейс закрыт------ #
             self.window.close()
-        if  cEvent == 'Escape:9':
+        if  cEvent in ['Escape:9', 'Escape:27']:
             # ------ Interfaces CLOSE------ #
             # ------ Интерфейс закрыт------ #
             self.window.close()
@@ -196,6 +194,9 @@ class ecrssh:
     # ------ Definition Main Interfaces objects------ #
     # ------ Определение интерфейсного объекта ------ #
     fStart = True
+    if not os.path.isdir('Logs'):
+        os.makedirs('Logs')            
+
     header_list:list = ['status', '       name job        ', 'IP', '  model  ', '    ID device    ', '  login   ']
 
     def __init__(self, oSg):
@@ -205,20 +206,22 @@ class ecrssh:
         # ------ Определение МЕНЮ ------ #
         self.menu_def:list = [['&File', ['!&Open...', '&Save', '---', 'E&xit']],
                          ['&Table', ['&Append...', 'Append &copy...', '---', '&Edit...', '---', '&Delete'], ],
-                         ['&Run', ['&Mark/Unmark     <Space>', '---', '&Start                  <F2>', '!&Pause', '!&Stop']],
+                         ['&Run', ['&Mark/Unmark     <Space>', '---', '&Start                  <F2>', 'Start &ONE          <F3>']],
                          ['&About...'],
                          ]
         # ------ Link interfaces object ------ #
         # ------ присвоение ссылки на объект интерфейса ------ #
-        self.sg:Object = oSg
-        self.msg1:String = 'main.json '
+        self.sg = oSg
+        self.msg1  = 'main.json '
         self.settings = self.sg.UserSettings(path='.')
         self.data:list = self.settings['data']
         #print(hasattr(self, 'data'), self.data,type(self.data),not self.data)
-        if not self.data:
+#        if not self.data:
+        #проверяем наличие данных в таблице
+        if self.data is None or not self.data:
             self.data:list = [['execute', '', 'x.x.x.x', 'linux', 'id001', 'admin', '', 'need only for Cisco', '']]
 #            self.recount = 1
-        
+        self.FlagSTOP = False
         self.recno = 0
         self.recount = len(self.data)
         # ------ Fiels Input/Output Definition ------ #
@@ -238,7 +241,7 @@ class ecrssh:
                         self.sg.Text('                '),
                         self.sg.Button('Mark/Unmark', key='--Mark/Unmark--'),
                         self.sg.Text('                '),
-                        self.sg.Button('Start', key='--START--'), self.sg.Button('Pause', key='--PAUSE--'), self.sg.Button('Stop', key='--STOP--')],
+                        self.sg.Button('Start', key='--START--'), self.sg.Button('Start ONE', key='--START1--')],
                        [self.sg.Output(size=(120, 15), background_color='black', text_color='white')],
                        [self.sg.Text('', relief=self.sg.RELIEF_SUNKEN, size=(25, 1), pad=(0, 3), key='-records-'),
                         self.sg.Text(self.msg1, relief=self.sg.RELIEF_SUNKEN, size=(75, 1), pad=(0, 3), key='-status-'),
@@ -294,50 +297,49 @@ class ecrssh:
             self.date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             self.window['-TIMER-'].update(f'{self.date}')
 
-
-        if self.cEvent == 'Home:110':
+        if self.cEvent in ['Home:110', 'End:35']:
         #переход в начало таблицы
             self.recno = 0
             self.refresh()
             return False
 
-        if self.cEvent == 'End:115':
+        if self.cEvent in ['End:115', 'End:36']:
         #переход в конец таблицы
             self.recno = self.recount-1
             self.refresh()
             return False
 
-        if self.cEvent == 'F2:68':
+        if self.cEvent in ['F2:68', 'F2:113']:
         #переход к выполнению комманды
             self.cEvent = '--START--'
             self.Handler()
             return False
 
-        if self.cEvent == 'F3:69':
+        if self.cEvent in ['F3:69', 'F3:114']:
         #переход к выполнению всех комманд
-            self.cEvent = '--START--'
+            self.cEvent = '--START1--'
             self.Handler()
             return False
 
-        if self.cEvent == 'F4:70':
+        if self.cEvent in ['F4:70', 'F4:115']:
         #переход к редактированию строки таблицы
             self.cEvent = '--EDIT--'
             self.Handler()
             return False
 
-        if self.cEvent == 'F5:71':
+        if self.cEvent in ['F5:71', 'F5:116']:
         #переход к добавлению строки таблицы
             self.cEvent = '--APPEND--'
             self.Handler()
             return False
 
-        if self.cEvent == 'F6:72':
+        if self.cEvent in ['F6:72', 'F6:117']:
         #переход к копированию и добавлению строки таблицы
             self.cEvent = '--APPENDCOPY--'
             self.Handler()
             return False
 
-        if self.cEvent == self.cEvent == 'space:65':
+        if self.cEvent == 'space:65':
         #переключение режима обработки для устройства
             self.cEvent = '--Mark/Unmark--'
             self.Handler()
@@ -345,6 +347,7 @@ class ecrssh:
         return True
 
     def refresh(self):
+        IsEnable = self.window.enable
         self.window.enable = False
         # # Re-Grab table focus using ttk
         # self.window['-DEVICE-'].SetFocus(force=True)
@@ -358,73 +361,80 @@ class ecrssh:
         self.window['-DEVICE-'].Widget.focus(self.recno+1)  # move focus
         self.window['-DEVICE-'].Widget.see(self.recno+1)  # scroll to show it
         self.window.enable = True
+        self.window.enable = IsEnable
         return
 
     def Handler(self):
     ## ------ Handler events------ #
     ## ------ Обработка поступивших событий от элементов управления------ #
+        self.window.enable = False
         if self.cEvent in ['--Mark/Unmark--', 'Mark/Unmark     <Space>']:
-            self.window.enable = False
             if self.data[self.recno][0] == 'execute':
                 self.data[self.recno][0] = 'nothing'
             else:
-                self.window.enable = False
                 self.data[self.recno][0] = 'execute'
             self.refresh()
         elif self.cEvent in ['--EDIT--', 'Edit...']:
-            self.window.enable = False
             self.oedit = ecrsshModify(sg, self, self.recno, self.data[self.recno], self.cEvent).eventread()
             self.refresh()
             self.settings['data'] = self.data
             print('save to file [main.json]')
         elif self.cEvent in ['--APPEND--', 'Append...']:
-            self.window.enable = False
             self.oedit = ecrsshModify(sg, self, self.recno, ['execute', '', 'x.x.x.x', 'linux', 'id'+str(self.recount), 'admin', '', 'need only for Cisco', ''], self.cEvent).eventread()
             self.refresh()
             self.settings['data'] = self.data
             print('save to file [main.json]')
         elif self.cEvent in ['--APPENDCOPY--', 'Append copy...']:
-            self.window.enable = False
             self.oedit = ecrsshModify(sg, self, self.recno, self.data[self.recno], self.cEvent).eventread()
             self.refresh()
             self.settings['data'] = self.data
             print('save to file [main.json]')
         elif self.cEvent in ['--DELETE--', 'Delete']:
-            self.window.enable = False
             self.data.remove(self.data[self.recno])
-            if not self.data:
+#            if self.data is None:
+            if self.data is None or not self.data:
                 self.data:list = [['execute', '', 'x.x.x.x', 'linux', 'id001', 'admin', '', 'need only for Cisco', '']]
             self.recno -= self.recno
             self.refresh()
             self.settings['data'] = self.data
             print('save to file [main.json]')
         elif self.cEvent in ['--START--', 'Start                  <F2>']:
-            print('--START--')
-            #self.window.enable = False
+            self.FlagSTOP = False
+            print('--START ALL SELECTED--')
+            _count_ = 0
+            for _device_ in self.data:
+               if _device_[0] == 'execute':
+                  _count_ = _count_ + 1
+                  _device_[0] = 'working'
+                  print(f'---------------START--------------- {_device_[4]}')
+                  retval = ExecuteCommands(self, _device_).send_now()
+                  if retval:
+                     print(f'---------------FINISH OK--------------- {_device_[4]}')
+                     _device_[0] = 'finished OK'
+                  else:
+                     print(f'---------------ERROR--------------- {_device_[4]}')
+                     _device_[0] = 'error'
+            print(f'--FINISH {_count_} SELECTED--')
+            self.refresh()
+        elif self.cEvent in ['--START1--', 'Start ONE          <F3>']:
+            print(f'---------------START--------------- {self.data[self.recno][4]}')
             self.data[self.recno][0] = 'working'
             self.refresh()
-
             retval = ExecuteCommands(self, self.data[self.recno]).send_now()
-
-            #self.window.enable = False
             if retval:
-                print('--FINISH OK--')
+                print(f'---------------FINISH OK--------------- {self.data[self.recno][4]}')
                 self.data[self.recno][0] = 'finished OK'
             else:
-                print('--ERROR--')
+                print(f'---------------ERROR--------------- {self.data[self.recno][4]}')
                 self.data[self.recno][0] = 'error'
+                
             self.refresh()
-        elif self.cEvent in ['--PAUSE--', 'Pause']:
-            pass
-        elif self.cEvent in ['--STOP--', 'Stop']:
-            pass
         elif self.cEvent == 'Save':
             self.settings['data'] = self.data
             print('save to file [main.json]')
+        self.window.enable = True
 
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    
-
     _SCREEN = ecrssh(sg).eventread()
