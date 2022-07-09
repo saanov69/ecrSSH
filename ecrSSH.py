@@ -7,7 +7,7 @@
 #
 #
 #
-from email.errors import NonASCIILocalPartDefect
+#from email.errors import NonASCIILocalPartDefect
 from datetime import date
 from netmiko import ConnectHandler
 import PySimpleGUI as sg
