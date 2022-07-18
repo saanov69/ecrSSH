@@ -19,7 +19,9 @@ import logging
 
 
 class ExecuteCommands:
+## ------ класс выполняющий комманды на удаленном устройстве
     def __init__(self, oParent, lData):
+    ## ------ подготовка к выполняющий комманды на удаленном устройстве
         self.oParent = oParent
         self.device_type = {
             "device_type":  lData[3],
@@ -34,6 +36,7 @@ class ExecuteCommands:
         self.sTime  = (f'{self.DateTime.strftime("%H_%M_%S")}')
         self.sIp  = lData[2]
         if not os.path.isdir('Logs/'+self.sDate):
+        ## ------ при отсутствии создать каталог для записи логов
             os.makedirs('Logs/'+self.sDate)            
         self.sLogFileName  = 'Logs/' + self.sDate +'/'+ lData[4] + '__' + self.sIp + '__' + self.sDate + '__' + self.sTime + '.txt'
         self.FindPrompt  = ''
@@ -290,12 +293,11 @@ class ecrssh:
                                 #, finalize=False, moodel=True return_keyboard_events=True, 
 
         self.window.bind('<space>', '--Mark/Unmark--')      # Make sure your window is finalized first
-        self.window.bind('<F2>', '--START--')      # Make sure your window is finalized first
-        self.window.bind('<F3>', '--START1--')      # Make sure your window is finalized first
-        self.window.bind('<F8>', '--DELETE--')      # Make sure your window is finalized first
-        self.window.bind('<Home>', '--Home--')      # Make sure your window is finalized first
-        self.window.bind('<End>', '--End--')      # Make sure your window is finalized first
-
+        self.window.bind('<F2>', '--START--')               # Make sure your window is finalized first
+        self.window.bind('<F3>', '--START1--')              # Make sure your window is finalized first
+        self.window.bind('<F8>', '--DELETE--')              # Make sure your window is finalized first
+        self.window.bind('<Home>', '--Home--')              # Make sure your window is finalized first
+        self.window.bind('<End>', '--End--')                # Make sure your window is finalized first
 
     def refresh(self):
     # ------ Обновление объекта интерфейса ------ #
